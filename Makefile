@@ -13,3 +13,6 @@ build: clean
 publish: clean test bump
 	npm publish --access public
 
+# no test
+quickpub: clean bump
+	npm publish --access public

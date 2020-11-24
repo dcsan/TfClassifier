@@ -1,7 +1,7 @@
 // require('@tensorflow/tfjs-node')
 import * as tf from "@tensorflow/tfjs-node";
 import * as sentenceEncoder from "@tensorflow-models/universal-sentence-encoder";
-const debug = require('debug-levels')('TfModel')
+const debug = require('debug-levels')('TfClassifier')
 import * as _ from 'lodash'
 import { readCsvFile } from './FileUtils'
 
@@ -85,10 +85,11 @@ class TfClassifier {
   }): Promise<tf.Sequential | tf.LayersModel> {
 
     const trainData: ITaggedInput[] = opts.data || this.trainData!
-    this.trainData = trainData
-    if (!trainData) {
+    if (!trainData || !trainData.length) {
       throw ('no trainData for trainModel')
     }
+    this.trainData = trainData
+    debug.log('trainData.length', trainData.length)
 
     await this.loadEncoder()
 
@@ -168,7 +169,7 @@ class TfClassifier {
       batchSize: 32,
       validationSplit: 0.1,
       shuffle: true,
-      epochs: 5,
+      epochs: 150,
       verbose: 0,
       // callbacks: tfvis.show.fitCallbacks(
       //   lossContainer,
