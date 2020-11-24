@@ -1,5 +1,5 @@
 import { readCsvFile } from '../FileUtils'
-import { TfClassifier, IMatch, ITaggedInput } from "../TfClassifier";
+import { TfClassifier, IMatch, ITaggedInput, ITrainOptions } from "../TfClassifier";
 
 const debug = require('debug-levels')('TfCl.test')
 
@@ -44,7 +44,7 @@ const checkMatches = async (model) => {
 test('train on csv', async () => {
   const model = await prepareModel()
   await model.loadCsvInputs('./data/inputs/train.csv')
-  await model.trainModel({ useCache: false })
+  await model.trainModel({ useCachedModel: false })
   await checkMatches(model)
 })
 
