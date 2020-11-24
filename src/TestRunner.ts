@@ -22,23 +22,20 @@ const TestRunner = {
     const testLines = (await readCsvFile('./data/inputs/test.csv')).slice(0, 2)
 
     // console.log('passed\tactual\texpect\tconfidence\t\ttext')
-    testLines.map(async input => {
-      const matches: IMatch[] | undefined = await testModel.classify(input.text, { expand: true })
+    testLines.map(async testInput => {
+      const matches: IMatch[] | undefined =
+        await testModel.classify(testInput.text, { expand: true })
+
+      const first = matches![0]
+      console.assert(first.tag === testInput.tag, 'mismatch', first, testInput)
       // const passed = prediction?.tag === line.tag ? chalk.green('√ PASS') : chalk.red('X FAIL')
       // const output = (`${passed} \t${line.tag} \t${prediction?.tag} \t${prediction?.confidence}\t${line.text.trim()}`)
       // const compare = `${line.tag}\t${line.text}\n${prediction?.tag}\t${prediction?.found?.text}`
       // const trainSents = testModel.matchingInputs(prediction!.tag)
 
-      console.log('input:', input.text)
+      console.log('input:', testInput.text)
       console.log('topMatch', matches![0])
       console.log('matches', matches)
-      // const firstTag = matches![0][0]
-      // const sources = testModel.matchingSources(firstTag)
-      // console.log('firstTag', firstTag)
-      // console.log('trained', sents)
-      // console.log(compare)
-      // console.assert(prediction?.tag === line.tag, chalk.red(`FAILED classify \n${line.text}\n`), prediction?.found?.text)
-      // console.log(prediction.others)
     })
   },
 

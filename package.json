@@ -1,5 +1,5 @@
 {
-  "name": "@dcsan/klassify",
+  "name": "@dcsan/tfclassify",
   "version": "0.0.10",
   "description": "TensorFlowJS classifier",
   "main": "dist/index.js",
