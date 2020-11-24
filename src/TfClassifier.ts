@@ -46,7 +46,7 @@ class TfClassifier {
   model: any
   loaded: boolean = false
   uniqueTags: string[] = []
-  inputs?: ITaggedInput[]
+  trainData?: ITaggedInput[]
 
   constructor(modelName = 'tfModel') {
     const modelDir = path.join(__dirname, 'data', 'modelCache')
@@ -68,11 +68,11 @@ class TfClassifier {
   }
 
   async loadCsvInputs(relPath, basePath = __dirname) {
-    this.inputs = await readCsvFile(relPath, basePath)
-    const before = this.inputs.length
+    this.trainData = await readCsvFile(relPath, basePath)
+    const before = this.trainData.length
     // filter items without required fields
-    this.inputs = this.inputs.filter(item => item.tag && item.text)
-    const diff = this.inputs.length - before
+    this.trainData = this.trainData.filter(item => item.tag && item.text)
+    const diff = this.trainData.length - before
     if (diff !== 0) {
       debug.warn('trimmed some items from inputs', diff)
     }
@@ -80,18 +80,19 @@ class TfClassifier {
 
   // force = ignore cached model
   async trainModel(opts: {
-    inputs?: ITaggedInput[],
+    data?: ITaggedInput[],
     useCache: boolean
   }): Promise<tf.Sequential | tf.LayersModel> {
 
-    const inputs: ITaggedInput[] = opts.inputs || this.inputs!
-    if (!inputs) {
-      throw ('no inputs for trainModel')
+    const trainData: ITaggedInput[] = opts.data || this.trainData!
+    this.trainData = trainData
+    if (!trainData) {
+      throw ('no trainData for trainModel')
     }
 
     await this.loadEncoder()
 
-    const allTags: string[] = inputs.map(t => t.tag)
+    const allTags: string[] = trainData.map(t => t.tag)
     this.uniqueTags = _.uniq(allTags)
 
     if (opts.useCache) {
@@ -108,11 +109,11 @@ class TfClassifier {
         debug.log("Training new model");
       }
     }
-    const xTrain = await this.encodeData(inputs);
+    const xTrain = await this.encodeData(trainData);
 
     // returns an array like [0,0,1,0] for each entry
     const labels = (
-      inputs.map((utt: ITaggedInput) => {
+      trainData.map((utt: ITaggedInput) => {
         const pos = this.uniqueTags.indexOf(utt.tag)
         const mat = new Array(this.uniqueTags.length).fill(0)
         mat[pos] = 1
@@ -154,6 +155,7 @@ class TfClassifier {
     //   })
     // );
 
+    debug.log('compile')
     model.compile({
       loss: "categoricalCrossentropy",
       optimizer: tf.train.adam(0.001),
@@ -161,12 +163,13 @@ class TfClassifier {
     });
 
     // const lossContainer = document.getElementById("loss-cont");
-
+    debug.log('fit')
     await model.fit(xTrain, yTrain, {
       batchSize: 32,
       validationSplit: 0.1,
       shuffle: true,
-      epochs: 150,
+      epochs: 5,
+      verbose: 0,
       // callbacks: tfvis.show.fitCallbacks(
       //   lossContainer,
       //   ["loss", "val_loss", "acc", "val_acc"],
@@ -239,8 +242,15 @@ class TfClassifier {
   }
 
   // find all original training sentences for that tag
+  // note -this assumes all trainData is in memory
+  // which might not be the case for reloading a cached model
   matchingSources(tag: string): ITaggedInput[] | undefined {
-    return this.inputs?.filter(item => item.tag === tag)
+    if (!this.trainData) {
+      debug.error('no trainData so cannot expand sources - are you reloading a model?')
+    }
+    const sources = this.trainData?.filter(item => item.tag === tag)
+    // debug.log('sources', tag, sources)
+    return sources
   }
 
 }

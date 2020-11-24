@@ -2,6 +2,13 @@
 
 Example package using TensorFlowJS to provide a classifier
 
+This uses the [Universal Sentence Encoder model](https://www.tensorflow.org/hub/tutorials/semantic_similarity_with_tf_hub_universal_encoder)
+
+> The Universal Sentence Encoder makes getting sentence level embeddings as easy as it has historically been to lookup the embeddings for individual words. The sentence embeddings can then be trivially used to compute sentence level meaning similarity as well as to enable better performance on downstream classification tasks using less supervised training data.
+
+And this it does! We use this model and word vectors for passed in sentences to make an easy to use sentence classifier!
+
+
 ## tests
 Makefile has basic tasks
 
@@ -20,6 +27,9 @@ READ,   I need to read more
 GYM,    Go to the gym
 READ,   do more reading
 ```
+
+- tag: a name for that 'class' of the classifier (I'll do multi-tags classes later)
+- text: example phrase
 
 You can (and should!) have multiple training phrases per tag.
 
@@ -61,9 +71,5 @@ matches: [
   ...
 ]
 ```
-
-
-tag: a name for that 'class' of the classifier
-text: example phrase
 
 
