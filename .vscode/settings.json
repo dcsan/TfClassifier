@@ -1,0 +1,6 @@
+{
+  "window.title": "${dirty} [ ${rootName} ] ${activeEditorLong}",
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#4b2c0a" // Change this color!
+  }
+}

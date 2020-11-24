@@ -1,5 +1,13 @@
-// require('@tensorflow/tfjs-node')
 import * as tf from "@tensorflow/tfjs-node";
+
+// import {
+//   // ActivationIdentifier,
+//   ActivationSerialization
+// } from '@tensorflow/tfjs-node'
+// import { DenseLayerArgs } from '@tensorflow/tfjs-node'
+
+
+
 import * as sentenceEncoder from "@tensorflow-models/universal-sentence-encoder";
 const debug = require('debug-levels')('TfClassifier')
 import * as _ from 'lodash'
@@ -27,6 +35,24 @@ export interface IMatch {
   confidence: number
   pct: number
   sources?: ITaggedInput[]
+}
+
+export interface ITrainOptions {
+  useCachedModel?: boolean
+  // FIXME - types ActivationSerialization - https://github.com/tensorflow/tfjs-layers/blob/master/tfjs-layers/src/keras_format/activation_config.ts#L30-L31
+  activation?: any,
+  epochs?: number
+  data?: ITaggedInput[]
+  learningRate?: number
+  verbose?: number
+}
+
+const defaultTrainOptions: ITrainOptions = {
+  useCachedModel: false,
+  activation: "softmax",
+  epochs: 150,
+  learningRate: 0.001,   // for adam classifier
+  verbose: 0
 }
 
 // export type IMatch = [string, number];
@@ -79,12 +105,11 @@ class TfClassifier {
   }
 
   // force = ignore cached model
-  async trainModel(opts: {
-    data?: ITaggedInput[],
-    useCache: boolean
-  }): Promise<tf.Sequential | tf.LayersModel> {
+  async trainModel(trainParams: ITrainOptions): Promise<tf.Sequential | tf.LayersModel> {
 
-    const trainData: ITaggedInput[] = opts.data || this.trainData!
+    const trainOpts = Object.assign(defaultTrainOptions, trainParams)
+
+    const trainData: ITaggedInput[] = trainOpts.data || this.trainData!
     if (!trainData || !trainData.length) {
       throw ('no trainData for trainModel')
     }
@@ -96,12 +121,13 @@ class TfClassifier {
     const allTags: string[] = trainData.map(t => t.tag)
     this.uniqueTags = _.uniq(allTags)
 
-    if (opts.useCache) {
+    if (trainOpts.useCachedModel) {
       try {
         const modelFile = `${this.modelUrl}/model.json` // annoying TF glitch
         const loadedModel = await tf.loadLayersModel(
           modelFile
         );
+        // TODO - check shape matches data
         debug.log("Using existing model");
         this.model = loadedModel
         return loadedModel;
@@ -136,7 +162,7 @@ class TfClassifier {
     model.add(
       tf.layers.dense({
         inputShape: inputShape,
-        activation: "softmax",
+        activation: trainOpts.activation,
         units: this.uniqueTags.length // number of classes for classifier
       })
     );
@@ -159,7 +185,7 @@ class TfClassifier {
     debug.log('compile')
     model.compile({
       loss: "categoricalCrossentropy",
-      optimizer: tf.train.adam(0.001),
+      optimizer: tf.train.adam(trainOpts.learningRate),
       metrics: ["accuracy"]
     });
 
@@ -169,8 +195,8 @@ class TfClassifier {
       batchSize: 32,
       validationSplit: 0.1,
       shuffle: true,
-      epochs: 150,
-      verbose: 0,
+      epochs: trainOpts.epochs,
+      verbose: trainOpts.verbose,
       // callbacks: tfvis.show.fitCallbacks(
       //   lossContainer,
       //   ["loss", "val_loss", "acc", "val_acc"],
