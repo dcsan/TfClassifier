@@ -8,8 +8,8 @@ const debug = require('debug-levels')('TestRunner')
 // const debug = require('debug-levels')('TestRunner')
 
 // use a cached version of the models
-// const useCache = false
-const useCache = true
+// const useCachedModel = false
+const useCachedModel = true
 
 const TestRunner = {
 
@@ -22,7 +22,7 @@ const TestRunner = {
   async train(): Promise<TfClassifier> {
     const model = await TestRunner.prepare()
     const data: ITaggedInput[] = await readCsvFile('./data/inputs/train.csv', __dirname)
-    await model.trainModel({ data, useCache: useCache })
+    await model.trainModel({ data, useCachedModel: useCachedModel })
     return model
   },
 
