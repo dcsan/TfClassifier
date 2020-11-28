@@ -6,8 +6,6 @@ import * as tf from "@tensorflow/tfjs-node";
 // } from '@tensorflow/tfjs-node'
 // import { DenseLayerArgs } from '@tensorflow/tfjs-node'
 
-
-
 import * as sentenceEncoder from "@tensorflow-models/universal-sentence-encoder";
 const debug = require('debug-levels')('TfClassifier')
 import * as _ from 'lodash'
@@ -55,6 +53,10 @@ const defaultTrainOptions: ITrainOptions = {
   verbose: 0
 }
 
+export interface ILoadOpts {
+  useCachedModel: boolean
+}
+
 // export type IMatch = [string, number];
 
 // export interface IMatch {
@@ -70,17 +72,45 @@ class TfClassifier {
   modelUrl: string
   encoder: any
   model: any
+  topicName: string  // eg topic
   loaded: boolean = false
   uniqueTags: string[] = []
   trainData?: ITaggedInput[]
 
-  constructor(modelName = 'tfModel') {
+  constructor(topicName = 'tfModel') {
+    this.topicName = topicName
     const modelDir = path.join(__dirname, 'data', 'modelCache')
     ensureDirectory(modelDir)
-    this.modelPath = path.join(modelDir, modelName)
+    this.modelPath = path.join(modelDir, topicName)
     this.modelUrl = `file://${this.modelPath}`
   }
 
+  async loadModel(opts: ILoadOpts = { useCachedModel: true }) {
+    const model = await this.tryCachedModel()
+    if (!model) {
+      debug.warn('cannot load cached model')
+    }
+    // TODO - train?
+  }
+
+  async tryCachedModel() {
+    try {
+      const modelFile = `${this.modelUrl}/model.json` // annoying TF glitch
+      const loadedModel = await tf.loadLayersModel(
+        modelFile
+      );
+      // TODO - check shape matches data
+      debug.log("Using cached model", this.topicName);
+      this.model = loadedModel
+      return loadedModel;
+    } catch (err) {
+      debug.log("cannot find cached model", err);
+      return false
+      // debug.log("Training new model");
+    }
+  }
+
+  // only needed for training?
   async loadEncoder() {
     if (this.loaded) return
     this.encoder = await sentenceEncoder.load()
@@ -122,19 +152,7 @@ class TfClassifier {
     this.uniqueTags = _.uniq(allTags)
 
     if (trainOpts.useCachedModel) {
-      try {
-        const modelFile = `${this.modelUrl}/model.json` // annoying TF glitch
-        const loadedModel = await tf.loadLayersModel(
-          modelFile
-        );
-        // TODO - check shape matches data
-        debug.log("Using existing model");
-        this.model = loadedModel
-        return loadedModel;
-      } catch (err) {
-        debug.log("err loading model", err);
-        debug.log("Training new model");
-      }
+      this.model = await this.tryCachedModel()
     }
     const xTrain = await this.encodeData(trainData);
 
