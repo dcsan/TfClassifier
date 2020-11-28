@@ -1,4 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
+import * as fs from 'fs'
 
 // import {
 //   // ActivationIdentifier,
@@ -57,6 +58,11 @@ export interface ILoadOpts {
   useCachedModel: boolean
 }
 
+const showEndTime = (msg, startTime) => {
+  const hrend = process.hrtime(startTime)
+  debug.info(`${msg} %ds %dms`, hrend[0], hrend[1] / 1000000)
+}
+
 // export type IMatch = [string, number];
 
 // export interface IMatch {
@@ -68,52 +74,87 @@ export interface ILoadOpts {
 // // }
 
 class TfClassifier {
-  modelPath: string
-  modelUrl: string
   encoder: any
+  modelPath?: string
+  modelDir?: string
+  modelUrl?: string
+  topicName?: string  // eg topic
   model: any
-  topicName: string  // eg topic
   loaded: boolean = false
   uniqueTags: string[] = []
-  trainData?: ITaggedInput[]
+  trainingData?: ITaggedInput[]
 
   constructor(topicName = 'tfModel') {
+    this.setTopic(topicName)
+  }
+
+  // allows to switch to a different topic
+  // but keep same loaded encoder
+  setTopic(topicName: string) {
     this.topicName = topicName
-    const modelDir = path.join(__dirname, 'data', 'modelCache')
-    ensureDirectory(modelDir)
-    this.modelPath = path.join(modelDir, topicName)
+    this.modelDir = path.join(__dirname, 'data', 'modelCache')
+    ensureDirectory(this.modelDir)
+    this.modelPath = path.join(this.modelDir, topicName)
     this.modelUrl = `file://${this.modelPath}`
   }
 
-  async loadModel(opts: ILoadOpts = { useCachedModel: true }) {
-    const model = await this.tryCachedModel()
-    if (!model) {
-      debug.warn('cannot load cached model')
-    }
-    // TODO - train?
-  }
-
-  async tryCachedModel() {
+  async loadCachedModel(opts: ILoadOpts = { useCachedModel: true }) {
+    await this.loadEncoder()  // always needed
     try {
-      const modelFile = `${this.modelUrl}/model.json` // annoying TF glitch
+      const modelFile = `${this.modelUrl}/model.json`
       const loadedModel = await tf.loadLayersModel(
         modelFile
       );
       // TODO - check shape matches data
       debug.log("Using cached model", this.topicName);
       this.model = loadedModel
+      await this.loadTrainingData()
       return loadedModel;
     } catch (err) {
-      debug.log("cannot find cached model", err);
+      debug.warn("cannot find cached model", this.modelPath, err);
       return false
-      // debug.log("Training new model");
     }
+  }
+
+  // save to local file so we can load with cached model
+  async saveTrainingData(trainingData: any[]) {
+    const jsonPath = path.join(this.modelPath!, 'trainingData.json')
+    try {
+      let data = JSON.stringify(trainingData, null, 2)
+      fs.writeFileSync(jsonPath, data)
+    } catch (err) {
+      debug.error('failed to write data', jsonPath)
+      throw (err)
+    }
+  }
+
+  // save to local file so we can load with cached model
+  async loadTrainingData() {
+    const jsonPath = path.join(this.modelPath!, 'trainingData.json')
+    try {
+      let rawdata = fs.readFileSync(jsonPath)
+      const trainingData = JSON.parse(String(rawdata))
+      await this.prepareTags(trainingData)
+      debug.log('loaded cached trainingData:', trainingData)
+      this.trainingData = trainingData
+    } catch (err) {
+      debug.error('failed to load trainingData', this.modelPath)
+      throw (err)
+    }
+  }
+
+  prepareTags(trainingData) {
+    const allTags: string[] = trainingData.map(t => t.tag)
+    this.uniqueTags = _.uniq(allTags)
+    return this.uniqueTags
   }
 
   // only needed for training?
   async loadEncoder() {
     if (this.loaded) return
+    var startTime = process.hrtime()
     this.encoder = await sentenceEncoder.load()
+    showEndTime('loaded encoder', startTime)
     this.loaded = true
   }
 
@@ -124,11 +165,11 @@ class TfClassifier {
   }
 
   async loadCsvInputs(relPath, basePath = __dirname) {
-    this.trainData = await readCsvFile(relPath, basePath)
-    const before = this.trainData.length
+    this.trainingData = await readCsvFile(relPath, basePath)
+    const before = this.trainingData.length
     // filter items without required fields
-    this.trainData = this.trainData.filter(item => item.tag && item.text)
-    const diff = this.trainData.length - before
+    this.trainingData = this.trainingData.filter(item => item.tag && item.text)
+    const diff = this.trainingData.length - before
     if (diff !== 0) {
       debug.warn('trimmed some items from inputs', diff)
     }
@@ -139,26 +180,27 @@ class TfClassifier {
 
     const trainOpts = Object.assign(defaultTrainOptions, trainParams)
 
-    const trainData: ITaggedInput[] = trainOpts.data || this.trainData!
-    if (!trainData || !trainData.length) {
-      throw ('no trainData for trainModel')
+    const trainingData: ITaggedInput[] = trainOpts.data || this.trainingData!
+    if (!trainingData || !trainingData.length) {
+      throw ('no trainingData for trainModel')
     }
-    this.trainData = trainData
-    debug.log('trainData.length', trainData.length)
+    this.trainingData = trainingData
+    await this.prepareTags(trainingData)
+    debug.log('trainingData.length', trainingData.length)
 
     await this.loadEncoder()
 
-    const allTags: string[] = trainData.map(t => t.tag)
-    this.uniqueTags = _.uniq(allTags)
-
+    var startTime = process.hrtime()
     if (trainOpts.useCachedModel) {
-      this.model = await this.tryCachedModel()
+      this.model = await this.loadCachedModel()
+      showEndTime('loaded model', startTime)
     }
-    const xTrain = await this.encodeData(trainData);
+    const xTrain = await this.encodeData(trainingData);
+    showEndTime('encoded data', startTime)
 
     // returns an array like [0,0,1,0] for each entry
     const labels = (
-      trainData.map((utt: ITaggedInput) => {
+      trainingData.map((utt: ITaggedInput) => {
         const pos = this.uniqueTags.indexOf(utt.tag)
         const mat = new Array(this.uniqueTags.length).fill(0)
         mat[pos] = 1
@@ -224,11 +266,12 @@ class TfClassifier {
       // )
     });
 
+    showEndTime('fitted model', startTime)
     this.model = model
 
     debug.log('writing model', this.modelUrl)
-    await model.save(this.modelUrl);
-
+    await model.save(this.modelUrl!)
+    await this.saveTrainingData(trainingData)
     return model;
   }
 
@@ -287,13 +330,13 @@ class TfClassifier {
   }
 
   // find all original training sentences for that tag
-  // note -this assumes all trainData is in memory
+  // note -this assumes all trainingData is in memory
   // which might not be the case for reloading a cached model
   matchingSources(tag: string): ITaggedInput[] | undefined {
-    if (!this.trainData) {
-      debug.error('no trainData so cannot expand sources - are you reloading a model?')
+    if (!this.trainingData) {
+      debug.error('no trainingData so cannot expand sources - are you reloading a model?')
     }
-    const sources = this.trainData?.filter(item => item.tag === tag)
+    const sources = this.trainingData?.filter(item => item.tag === tag)
     // debug.log('sources', tag, sources)
     return sources
   }
