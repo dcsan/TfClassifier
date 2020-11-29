@@ -108,6 +108,7 @@ class TfClassifier {
       // TODO - check shape matches data
       debug.log("Using cached model", this.topicName);
       this.model = loadedModel
+      // its critical that training and model data match
       await this.loadTrainingData()
       return loadedModel;
     } catch (err) {
@@ -175,7 +176,8 @@ class TfClassifier {
     }
   }
 
-  // force = ignore cached model
+  // this NEVER uses a cache
+  // use .loadCachedModel instead
   async trainModel(trainParams: ITrainOptions): Promise<tf.Sequential | tf.LayersModel> {
 
     const trainOpts = Object.assign(defaultTrainOptions, trainParams)
@@ -185,16 +187,17 @@ class TfClassifier {
       throw ('no trainingData for trainModel')
     }
     this.trainingData = trainingData
+    await this.saveTrainingData(trainingData)
     await this.prepareTags(trainingData)
     debug.log('trainingData.length', trainingData.length)
 
     await this.loadEncoder()
 
     var startTime = process.hrtime()
-    if (trainOpts.useCachedModel) {
-      this.model = await this.loadCachedModel()
-      showEndTime('loaded model', startTime)
-    }
+    // if (trainOpts.useCachedModel) {
+    //   this.model = await this.loadCachedModel()
+    //   showEndTime('loaded model', startTime)
+    // }
     const xTrain = await this.encodeData(trainingData);
     showEndTime('encoded data', startTime)
 
@@ -271,7 +274,6 @@ class TfClassifier {
 
     debug.log('writing model', this.modelUrl)
     await model.save(this.modelUrl!)
-    await this.saveTrainingData(trainingData)
     return model;
   }
 
