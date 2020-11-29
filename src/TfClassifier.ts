@@ -102,9 +102,7 @@ class TfClassifier {
     await this.loadEncoder()  // always needed
     try {
       const modelFile = `${this.modelUrl}/model.json`
-      const loadedModel = await tf.loadLayersModel(
-        modelFile
-      );
+      const loadedModel = await tf.loadLayersModel(modelFile);
       // TODO - check shape matches data
       debug.log("Using cached model", this.topicName);
       this.model = loadedModel
@@ -120,12 +118,13 @@ class TfClassifier {
   // save to local file so we can load with cached model
   async saveTrainingData(trainingData: any[]) {
     const jsonPath = path.join(this.modelPath!, 'trainingData.json')
+    ensureDirectory(this.modelDir)
     try {
       let data = JSON.stringify(trainingData, null, 2)
       fs.writeFileSync(jsonPath, data)
     } catch (err) {
-      debug.error('failed to write data', jsonPath)
-      throw (err)
+      debug.error('failed to saveTrainingData', jsonPath)
+      // throw (err)
     }
   }
 
