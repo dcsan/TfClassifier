@@ -107,10 +107,16 @@ class TfClassifier {
       debug.log("Using cached model", this.topicName);
       this.model = loadedModel
       // its critical that training and model data match
-      await this.loadTrainingData()
-      return loadedModel;
     } catch (err) {
-      debug.warn("cannot find cached model", this.modelPath, err);
+      debug.error("cannot load cached model:", this.modelPath);
+      // debug.warn(err)
+      return false
+    }
+
+    try {
+      await this.loadTrainingData()
+      return true
+    } catch (err) {
       return false
     }
   }
@@ -139,7 +145,7 @@ class TfClassifier {
       this.trainingData = trainingData
     } catch (err) {
       debug.error('failed to load trainingData', this.modelPath)
-      throw (err)
+      // throw (err)
     }
   }
 

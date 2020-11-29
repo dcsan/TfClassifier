@@ -71,9 +71,19 @@ const TestRunner = {
     await TestRunner.testClassifier(model, 'chat')
   },
 
+  // try to load cached model that does not exist
+  async testLoadWithNoCache() {
+    const model = new TfClassifier('college') // should be different in production
+    await model.setTopic('randomNewThing')
+    // await model.loadEncoder()
+    const useCached = await model.loadCachedModel() ||
+      debug.log('failed to get cached model - need to train')
+    console.assert(useCached !== true, 'useCached should not work if not cached')
+  },
 
   async runSuite() {
-    await TestRunner.testSwitchTopic()
+    await TestRunner.testLoadWithNoCache()
+    // await TestRunner.testSwitchTopic()
     // await TestRunner.testAndTrain('chat')
     // await TestRunner.testOne('chat')
 

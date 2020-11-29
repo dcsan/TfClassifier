@@ -13,6 +13,11 @@ build: clean
 publish: clean test bump
 	npm publish --access public
 
-# no test
+# run tests after
 quickpub: clean bump
 	npm publish --access public
+	npm run test
+
+# leave the .gitignore
+cleanCaches:
+	rm -rf src/data/modelCache/*
