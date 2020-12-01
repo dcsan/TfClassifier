@@ -7,4 +7,4 @@ export {
   IMatch
 } from './TfClassifier'
 
-export { readCsvFile } from './FileUtils'
+export { readCsvFile } from './utils/FileUtils'

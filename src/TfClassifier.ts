@@ -10,11 +10,32 @@ import * as fs from 'fs'
 import * as sentenceEncoder from "@tensorflow-models/universal-sentence-encoder";
 const debug = require('debug-levels')('TfClassifier')
 import * as _ from 'lodash'
-import { readCsvFile } from './FileUtils'
+import { readCsvFile } from './utils/FileUtils'
+import { TextUtils } from './utils/TextUtils'
 
 import * as path from 'path'
-import { ensureDirectory } from './FileUtils'
+import { ensureDirectory } from './utils/FileUtils'
 // total different categories
+
+export interface ClassifyMeta {
+  jwScore: number
+  wordsIntersection: number
+  pct: number
+  avgConf: number
+  confRatio: number
+  conf0: number
+  conf1: number
+  conf2: number
+  delta1: number // conf difference of match 0 to 1
+  delta2: number
+  delta12: number
+  trainingSize: number
+}
+
+export interface ClassifyResult {
+  matches: IMatch[]
+  meta: ClassifyMeta
+}
 
 export interface ITaggedInput {
   text: string
@@ -60,7 +81,9 @@ export interface ILoadOpts {
 
 const showEndTime = (msg, startTime) => {
   const hrend = process.hrtime(startTime)
-  debug.info(`${msg} %ds %dms`, hrend[0], hrend[1] / 1000000)
+  const ms = hrend[1] / 1000000
+  // process.stdout.write(` << time: ${msg} ${hrend[0]}s ${ms}ms`)
+  debug.log(`${msg} << time: ${hrend[0]}s ${ms}ms`)
 }
 
 // export type IMatch = [string, number];
@@ -91,6 +114,7 @@ class TfClassifier {
   // allows to switch to a different topic
   // but keep same loaded encoder
   setTopic(topicName: string) {
+    debug.info('setTopic', topicName)
     this.topicName = topicName
     this.modelDir = path.join(__dirname, 'data', 'modelCache')
     ensureDirectory(this.modelDir)
@@ -140,12 +164,15 @@ class TfClassifier {
     try {
       let rawdata = fs.readFileSync(jsonPath)
       const trainingData = JSON.parse(String(rawdata))
-      await this.prepareTags(trainingData)
-      debug.log('loaded cached trainingData:', trainingData)
-      this.trainingData = trainingData
+      if (trainingData && trainingData.length) {
+        await this.prepareTags(trainingData)
+        debug.log('loaded cached trainingData.length', trainingData.length)
+        this.trainingData = trainingData
+      } else {
+        debug.error('trainingData is empty', jsonPath, trainingData)
+      }
     } catch (err) {
-      debug.error('failed to load trainingData', this.modelPath)
-      // throw (err)
+      debug.error('failed to load cached trainingData', this.modelPath)
     }
   }
 
@@ -157,10 +184,11 @@ class TfClassifier {
 
   // only needed for training?
   async loadEncoder() {
+    debug.info('loadEncoder start >>')
     if (this.loaded) return
     var startTime = process.hrtime()
     this.encoder = await sentenceEncoder.load()
-    showEndTime('loaded encoder', startTime)
+    showEndTime('loaded', startTime)
     this.loaded = true
   }
 
@@ -282,13 +310,62 @@ class TfClassifier {
     return model;
   }
 
+
+  calcMeta(
+    input: string,
+    matches: IMatch[],
+  ): ClassifyMeta | undefined {
+    if (!matches[0]) {
+      debug.error('found no matches')
+      return
+    }
+    const first = matches[0]
+    const matchedText = first.sources![0].text
+    const trainingSize = this.trainingData?.length
+
+    const conf0 = matches![0]?.confidence  // basic confidence
+    const avgConf = (1.0 / trainingSize!) //  average confidence if evenly distributed
+    const confRatio = conf0 / avgConf       // ratio compared to average 1 = equal <1 = bad
+
+    const conf1 = matches![1]?.confidence
+    const conf2 = matches![2]?.confidence
+    const delta1 = conf0 - conf1
+    const delta2 = conf0 - conf2
+    const delta12 = conf1 - conf2
+
+    // simple string comparison
+    const jwScore = TextUtils.JaroWrinker(input, matchedText)
+    const wordsIntersection = TextUtils.wordsIntersection(input, matchedText)
+
+    const meta: ClassifyMeta = {
+      pct: first.pct,
+      jwScore,
+      wordsIntersection,
+      avgConf,
+      confRatio,
+      conf0,
+      conf1,
+      conf2,
+      delta1,
+      delta2,
+      delta12,
+      trainingSize: trainingSize!
+    }
+    return meta
+  }
+
   async classify(
     input: string,
-    opts: { maxHits?: number, expand?: boolean, context?: string } = { maxHits: 10, expand: true }): Promise<IMatch[] | undefined> {
+    opts: { maxHits?: number, expand?: boolean, context?: string } = { maxHits: 10, expand: true }): Promise<ClassifyResult | undefined> {
+    if (!this.model) {
+      debug.error('tried to classify without active model topicName:', { topic: this.topicName, input, opts })
+      return
+    }
+
     // const maxHits = opts.maxHits || 10
     input = input.trim()
     if (!input) {
-      debug.warn('empty input to predictor')
+      debug.error('empty input to predictor', input, opts)
       return
     }
     const xPredict = await this.encodeData([{ text: input }])
@@ -321,11 +398,16 @@ class TfClassifier {
     const sortedMatches = matches.sort((a, b) => {
       return (a.confidence < b.confidence ? 1 : -1)
     })
-
     const topMatches = opts.maxHits ? sortedMatches.slice(0, opts.maxHits) : sortedMatches
     const expMatches = opts.expand ? this.expandMatches(topMatches) : topMatches
+
+    const meta: ClassifyMeta = this.calcMeta(input, matches)!
+
     // TODO - filter on context of expanded matches
-    return expMatches
+    return {
+      matches: expMatches,
+      meta
+    }
   };
 
   expandMatches(matches: IMatch[]) {

@@ -1,8 +1,17 @@
+//x @ts-nocheck
+
 // cant use jest to run TfJS tests
 // https://stackoverflow.com/questions/57452981/tensorflowjs-save-model-throws-error-unsupported-typedarray-subtype-float32arr
+import { strict as assert } from 'assert';
 
-import { TfClassifier, IMatch, ITaggedInput } from "./TfClassifier";
-import { readCsvFile } from './FileUtils'
+import {
+  TfClassifier, IMatch,
+  ITaggedInput,
+  ClassifyResult
+} from "./TfClassifier";
+import { readCsvFile } from './utils/FileUtils'
+import { TextUtils } from './utils/TextUtils'
+
 import chalk from 'chalk'
 const debug = require('debug-levels')('TestRunner')
 // const debug = require('debug-levels')('TestRunner')
@@ -36,13 +45,13 @@ const TestRunner = {
 
     // console.log('passed\tactual\texpect\tconfidence\t\ttext')
     testLines.map(async testInput => {
-      const matches: IMatch[] | undefined =
+      const testRes: ClassifyResult | undefined =
         await model.classify(testInput.text, { expand: true })
 
-      debug.log('test', { testInput, matches })
+      debug.log('test', { testInput, testRes })
 
-      const first = matches![0]
-      console.assert(first.tag === testInput.tag, 'mismatch', first, testInput)
+      const first = testRes?.matches![0]
+      console.assert(first?.tag === testInput.tag, 'mismatch', first, testInput)
 
       // console.log('input:', testInput.text)
       // console.log('topMatch', matches![0])
@@ -81,8 +90,94 @@ const TestRunner = {
     console.assert(useCached !== true, 'useCached should not work if not cached')
   },
 
+  stringCompares(s1, s2) {
+    debug.log('\n----')
+    debug.log('s1', s1)
+    debug.log('s2', s2)
+    const jwScore = TextUtils.JaroWrinker(s1, s2)
+    const bowScore = TextUtils.wordsIntersection(s1, s2)
+    debug.log('jwScore:', jwScore)
+    debug.log('bowScore:', bowScore)
+  },
+
+  checkSimilarity(simFunc) {
+    simFunc(
+      'The quick brown fox jumped over the lazy dog',
+      'The small brown fox jumped from dog to table'
+    )
+
+    simFunc(
+      'The dog was small',
+      'It was a small dog'
+    )
+
+    simFunc(
+      'Was he expected to win the race?',
+      'Did he expect to win?'
+    )
+
+    simFunc(
+      'Did he plan to win?',
+      'Did he expect to win?'
+    )
+
+    simFunc(
+      'This sentence is short',
+      'This is a short sentence'
+    )
+
+    simFunc(
+      'This sentence is a bit longer with a couple of changes',
+      'This sentence is a longer with some changes',
+    )
+
+    simFunc(
+      'The dog was small',
+      'the rabbit saw the dog'
+    )
+
+    simFunc(
+      'The dog was small',
+      'blue fish for all'
+    )
+
+    simFunc(
+      'The dog was small',
+      'blue fish random things'
+    )
+
+    simFunc(
+      'The dog was small',
+      'the rabbit saw the dog but there was much else to see'
+    )
+
+    simFunc(
+      'The dog was small',
+      'It was a small dog but there was much else to see'
+    )
+
+  },
+
+  // test values recorded in metadata are matching
+  async testMeta() {
+    const klassy = await TestRunner.trainOne('college')
+    const result1 = await klassy.classify('Read the news in English Language')
+    // const result2 = await klassy.classify('Read English Language news')
+    // debug.log('result1', result1)
+    // debug.log('result2', result2)
+    const meta = result1!.meta!
+    assert(meta.confRatio > 2, 'meta confRatio')  // important > 1.0 !
+    assert(meta.jwScore > 0.5, 'meta jwScore problem')
+    assert(meta.wordsIntersection > 0.2, 'meta wordsIntersection mismatch')
+    assert(meta.pct > 48, 'meta wordsIntersection mismatch')
+    assert(meta.pct > 48, 'meta pct')
+    assert(meta.delta1 > 0.3, 'meta delta1')
+  },
+
   async runSuite() {
-    await TestRunner.testLoadWithNoCache()
+    await this.testMeta()
+    // this.checkSimilarity(this.stringCompares)
+    // await TestRunner.testLoadWithNoCache()
     // await TestRunner.testSwitchTopic()
     // await TestRunner.testAndTrain('chat')
     // await TestRunner.testOne('chat')

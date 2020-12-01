@@ -1,4 +1,4 @@
-import { readCsvFile } from '../FileUtils'
+import { readCsvFile } from '../utils/FileUtils'
 
 const debug = require('debug-levels')('TfCl.test')
 
