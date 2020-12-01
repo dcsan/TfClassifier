@@ -84,9 +84,9 @@ const TextUtils = {
     // debug.log('set2', set1)
     const avgSize = (set1.size + set2.size) / 2.0
     const overlap = intersection.size / avgSize
-    debug.log('intersection', intersection)
-    debug.log(`calc: ${intersection.size} / ${avgSize}`)
-    debug.log('overlap', overlap)
+    // debug.log('intersection', intersection)
+    // debug.log(`calc: ${intersection.size} / ${avgSize}`)
+    // debug.log('overlap', overlap)
     return overlap
   }
 

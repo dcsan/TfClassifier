@@ -170,8 +170,7 @@ const TestRunner = {
     assert(meta.jwScore > 0.5, 'meta jwScore problem')
     assert(meta.wordsIntersection > 0.2, 'meta wordsIntersection mismatch')
     assert(meta.pct > 48, 'meta wordsIntersection mismatch')
-    assert(meta.pct > 48, 'meta pct')
-    assert(meta.delta1 > 0.3, 'meta delta1')
+    assert(meta.delta1 > 0.3, `meta delta1 ${meta.delta1}`)
   },
 
   async runSuite() {
