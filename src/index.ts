@@ -4,6 +4,9 @@ export {
   TfClassifier,
   ITaggedInput,
   ITrainOptions,
+  ClassifyMeta,
+  ClassifyResult,
+  // IClassification,
   IMatch
 } from './TfClassifier'
 

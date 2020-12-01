@@ -42,13 +42,13 @@ export interface ITaggedInput {
   tag: string
 }
 
-export interface IClassification {
-  input: string
-  tag: string
-  confidence: number
-  found?: ITaggedInput
-  others: ITaggedInput[]
-}
+// export interface IClassification {
+//   input: string
+//   tag: string
+//   confidence: number
+//   found?: ITaggedInput
+//   others: ITaggedInput[]
+// }
 
 export interface IMatch {
   tag: string
