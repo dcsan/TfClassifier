@@ -1,6 +1,7 @@
 const csv = require('csv-parser');
 const fs = require('fs');
 import * as path from 'path'
+const debug = require('debug-levels')('FileUtils')
 
 const readCsvFile = (fp: string, basePath: string = __dirname): Promise<any[]> => {
   const fullPath = path.join(basePath, fp)
@@ -25,7 +26,20 @@ const readCsvFile = (fp: string, basePath: string = __dirname): Promise<any[]> =
 const ensureDirectory = (dirPath) => {
   if (fs.existsSync(dirPath)) { return }
   // else
-  fs.mkdirSync(dirPath, { recursive: true })
+  debug.log('creating dir', dirPath)
+  try {
+
+    fs.mkdirSync(dirPath, { recursive: true })
+    if (!fs.existsSync(dirPath)) {
+      debug.error('FAIL to create dir', dirPath)
+      return false
+    }
+    return true
+  } catch (err) {
+    debug.error('ERROR on creating dir', dirPath)
+    debug.error(err)
+    return false
+  }
 }
 
 export { readCsvFile, ensureDirectory }

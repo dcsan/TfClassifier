@@ -114,18 +114,18 @@ class TfClassifier {
 
   // allows to switch to a different topic
   // but keep same loaded encoder
-  setTopic(topicName: string) {
+  setTopic(topicName: string, basePath = __dirname) {
     debug.info('setTopic', topicName)
     this.topicName = topicName
-    this.modelDir = path.join(__dirname, 'data', 'modelCache')
+    this.modelDir = path.join(basePath, 'data', 'modelCache')
     ensureDirectory(this.modelDir)
     this.modelPath = path.join(this.modelDir, topicName)
     this.modelUrl = `file://${this.modelPath}`
   }
 
   async loadCachedModel(opts: ILoadOpts = { useCachedModel: true }) {
-    await this.loadEncoder()  // always needed
     try {
+      await this.loadEncoder()  // always needed
       const modelFile = `${this.modelUrl}/model.json`
       const loadedModel = await tf.loadLayersModel(modelFile);
       // TODO - check shape matches data
@@ -155,7 +155,7 @@ class TfClassifier {
       fs.writeFileSync(jsonPath, data)
     } catch (err) {
       debug.error('failed to saveTrainingData', jsonPath)
-      // throw (err)
+      debug.error(err)
     }
   }
 
@@ -192,7 +192,12 @@ class TfClassifier {
     debug.info('loadEncoder start >>')
     if (this.loaded) return
     var startTime = process.hrtime()
-    this.encoder = await sentenceEncoder.load()
+    try {
+      this.encoder = await sentenceEncoder.load()
+    } catch (err) {
+      debug.error('sentence encoder failed to load:', err)
+      this.loaded = false
+    }
     showEndTime('loaded', startTime)
     this.loaded = true
   }
