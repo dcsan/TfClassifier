@@ -140,12 +140,9 @@ class TfClassifier {
     }
 
     try {
-      await this.loadTrainingData()
-      this.cached = true
-      return true
+      this.cached = await this.loadTrainingData()
     } catch (err) {
       this.cached = false
-      return false
     }
   }
 
@@ -163,7 +160,7 @@ class TfClassifier {
   }
 
   // save to local file so we can load with cached model
-  async loadTrainingData() {
+  async loadTrainingData(): Promise<boolean> {
     const jsonPath = path.join(this.modelPath!, 'trainingData.json')
     try {
       let rawdata = fs.readFileSync(jsonPath)
@@ -172,11 +169,15 @@ class TfClassifier {
         await this.prepareTags(trainingData)
         debug.log('loaded cached trainingData.length', trainingData.length)
         this.trainingData = trainingData
+        return true
       } else {
         debug.error('trainingData is empty', jsonPath, trainingData)
+        return false
       }
     } catch (err) {
       debug.error('failed to load cached trainingData', this.modelPath)
+      this.cached = false
+      return false
     }
   }
 
