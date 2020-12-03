@@ -1,5 +1,10 @@
 # TODO:
 
+- [ ] other models eg  universal-sentence-encoder-qa
+https://tfhub.dev/google/universal-sentence-encoder-qa/2
+
+
+
 dev:
 - [ ] pass options to classifier eg epochs
 - [ ] load data separately from training to allow use of cached items

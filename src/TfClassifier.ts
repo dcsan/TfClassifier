@@ -106,6 +106,7 @@ class TfClassifier {
   loaded: boolean = false
   uniqueTags: string[] = []
   trainingData?: ITaggedInput[]
+  cached: boolean = false
 
   constructor(topicName = 'tfModel') {
     this.setTopic(topicName)
@@ -134,13 +135,16 @@ class TfClassifier {
     } catch (err) {
       debug.error("cannot load cached model:", this.modelPath);
       // debug.warn(err)
+      this.cached = false
       return false
     }
 
     try {
       await this.loadTrainingData()
+      this.cached = true
       return true
     } catch (err) {
+      this.cached = false
       return false
     }
   }
