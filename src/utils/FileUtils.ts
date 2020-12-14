@@ -24,7 +24,10 @@ const readCsvFile = (fp: string, basePath: string = __dirname): Promise<any[]> =
 }
 
 const ensureDirectory = (dirPath) => {
-  if (fs.existsSync(dirPath)) { return }
+  if (fs.existsSync(dirPath)) {
+    debug.info('ensure dir OK', dirPath)
+    return
+  }
   // else
   debug.log('creating dir', dirPath)
   try {

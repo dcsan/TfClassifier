@@ -114,10 +114,10 @@ class TfClassifier {
 
   // allows to switch to a different topic
   // but keep same loaded encoder
-  setTopic(topicName: string, basePath = __dirname) {
+  setTopic(topicName: string, basePath: string = __dirname) {
     debug.info('setTopic', topicName)
     this.topicName = topicName
-    this.modelDir = path.join(basePath, 'data', 'modelCache')
+    this.modelDir = path.join(basePath, 'modelCache')
     ensureDirectory(this.modelDir)
     this.modelPath = path.join(this.modelDir, topicName)
     this.modelUrl = `file://${this.modelPath}`
@@ -133,7 +133,7 @@ class TfClassifier {
       this.model = loadedModel
       // its critical that training and model data match
     } catch (err) {
-      debug.error("cannot load cached model:", this.modelPath);
+      debug.error("ERROR cannot load cached model:", this.modelPath);
       // debug.warn(err)
       this.cached = false
       return false
@@ -154,8 +154,8 @@ class TfClassifier {
       let data = JSON.stringify(trainingData, null, 2)
       fs.writeFileSync(jsonPath, data)
     } catch (err) {
-      debug.error('failed to saveTrainingData', jsonPath)
-      debug.error(err)
+      debug.error('ERROR failed to saveTrainingData', jsonPath)
+      // debug.error(err)
     }
   }
 
@@ -171,11 +171,11 @@ class TfClassifier {
         this.trainingData = trainingData
         return true
       } else {
-        debug.error('trainingData is empty', jsonPath, trainingData)
+        debug.error('ERROR trainingData is empty', jsonPath, trainingData)
         return false
       }
     } catch (err) {
-      debug.error('failed to load cached trainingData', this.modelPath)
+      debug.error('ERROR failed to load cached trainingData', this.modelPath)
       this.cached = false
       return false
     }
@@ -195,7 +195,7 @@ class TfClassifier {
     try {
       this.encoder = await sentenceEncoder.load()
     } catch (err) {
-      debug.error('sentence encoder failed to load:', err)
+      debug.error('ERROR sentence encoder failed to load:', err)
       this.loaded = false
     }
     showEndTime('loaded', startTime)
@@ -203,7 +203,20 @@ class TfClassifier {
   }
 
   async encodeData(tasks: any) {
-    const sentences = tasks.map(t => t.text.toLowerCase());
+    const sentences = tasks.map(t => {
+      if (!t.text) {
+        debug.error('ERROR no text for elem', t)
+        return
+      }
+      return t.text.toLowerCase()
+    });
+    if (!this.encoder) {
+      await this.loadEncoder()
+    }
+    if (!this.encoder) {
+      // debug.error('ERROR tried to encode with no encoder')
+      throw new Error('ERROR tried to encode with no encoder')
+    }
     const embeddings = await this.encoder.embed(sentences);
     return embeddings;
   }
@@ -326,7 +339,7 @@ class TfClassifier {
     matches: IMatch[],
   ): ClassifyMeta | undefined {
     if (!matches[0]) {
-      debug.error('found no matches')
+      debug.error('ERROR found no matches')
       return
     }
     const first = matches[0]
@@ -368,14 +381,14 @@ class TfClassifier {
     input: string,
     opts: { maxHits?: number, expand?: boolean, context?: string } = { maxHits: 10, expand: true }): Promise<ClassifyResult | undefined> {
     if (!this.model) {
-      debug.error('tried to classify without active model topicName:', { topic: this.topicName, input, opts })
+      debug.error('ERROR tried to classify without active model topicName:', { topic: this.topicName, input, opts })
       return
     }
 
     // const maxHits = opts.maxHits || 10
     input = input.trim()
     if (!input) {
-      debug.error('empty input to predictor', input, opts)
+      debug.error('ERROR empty input to predictor', input, opts)
       return
     }
     const xPredict = await this.encodeData([{ text: input }])
@@ -433,7 +446,7 @@ class TfClassifier {
   // which might not be the case for reloading a cached model
   matchingSources(tag: string): ITaggedInput[] | undefined {
     if (!this.trainingData) {
-      debug.error('no trainingData so cannot expand sources - are you reloading a model?')
+      debug.error('ERROR no trainingData so cannot expand sources - are you reloading a model?')
     }
     const sources = this.trainingData?.filter(item => item.tag === tag)
     // debug.log('sources', tag, sources)
